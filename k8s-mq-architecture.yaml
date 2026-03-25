@@ -1,0 +1,105 @@
+# [1.0.0] @done_log: 작업자(Consumer) 설정: 24시간 내내 큐만 바라보며 연산하는 워커 3명
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analy-consumer
+spec:
+  replicas: 10  # 💡 마법의 숫자: 작업자를 3명으로 늘립니다! (10으로 바꾸면 10명이 됩니다)
+  selector:
+    matchLabels:
+      app: analy-consumer
+  template:
+    metadata:
+      labels:
+        app: analy-consumer
+    spec:
+      containers:
+      - name: consumer
+        image: bus_rt_monitoring:b3.0.31
+        imagePullPolicy: Never
+        # 역할(role)을 consumer로 지정하여 무한 대기 모드로 실행
+        command: [
+          "python", "-m", "scripts.run", 
+          "--name", "analy_module", 
+          "--run_mode", "normal", 
+          "--env", "dev", 
+          "--role", "consumer",
+          # "--local"
+        ]
+        # 무한 실행용
+        # command: ["sleep", "infinity"]
+        resources:
+          requests:
+            memory: "100Mi" # 최소 보장 메모리
+            cpu: "100m"     # 최소 보장 CPU
+          limits:
+            memory: "500Mi" # 💡 이 이상 쓰면 K8s가 파드를 강제로 죽이고 재시작함 (서버 보호)
+            cpu: "500m"     # 💡 최대 CPU 한계치
+        volumeMounts:
+        - name: ipconfig-vol
+          mountPath: /ipconfig_cryp.ini
+          subPath: ipconfig_cryp.ini
+          readOnly: true
+        - name: cryptogram-vol
+          mountPath: /cryptogram
+          readOnly: true
+      volumes:
+      - name: ipconfig-vol
+        configMap:
+          name: ipconfig-cmap
+      - name: cryptogram-vol
+        hostPath:
+          path: /home/gj_anly/cryptogram
+
+---
+# =====================================================================
+# 2. 반장(Producer) 설정: 5분마다 DB에서 1000개를 읽어 큐에 넣고 퇴근
+# =====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: analy-producer-cron
+spec:
+  schedule: "*/5 * * * *"     # 5분 주기 실행
+  concurrencyPolicy: Forbid   # 중복 실행 방지
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure # 끝나면 재시작하지 않음
+          containers:
+          - name: producer
+            image: bus_rt_monitoring:b3.0.31 
+            imagePullPolicy: Never
+            # 💡 역할(role)을 producer로 지정하여 10초 만에 목록만 만들고 퇴근
+            command: [
+              "python", "-m", "scripts.run", 
+              "--name", "analy_module", 
+              "--run_mode", "normal", 
+              "--env", "dev", 
+              "--role", "producer",
+              # "--local"
+            ]
+            # command: ["sleep", "infinity"]
+            resources:
+              requests:
+                memory: "100Mi" # 최소 보장 메모리
+                cpu: "100m"     # 최소 보장 CPU
+              limits:
+                memory: "500Mi" # 💡 이 이상 쓰면 K8s가 파드를 강제로 죽이고 재시작함 (서버 보호)
+                cpu: "500m"     # 💡 최대 CPU 한계치
+            volumeMounts:
+            - name: ipconfig-vol
+              mountPath: /ipconfig_cryp.ini
+              subPath: ipconfig_cryp.ini
+              readOnly: true
+            - name: cryptogram-vol
+              mountPath: /cryptogram
+              readOnly: true
+          volumes:
+          - name: ipconfig-vol
+            configMap:
+              name: ipconfig-cmap
+          - name: cryptogram-vol
+            hostPath:
+              path: /home/gj_anly/cryptogram

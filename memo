@@ -1,0 +1,3 @@
+k8s-deploy >>> 순수하게 쿠버네티스를 적용
+k8s-cronjob >>> 크론탭을 대체하는 방식으로 업그레이드
+k8s-mq-architecture >>> cronjob 뿐만 아니라 Redis 와 연동되도록 업그레이드
