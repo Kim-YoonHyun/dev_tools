@@ -1,11 +1,11 @@
 #!/bin/bash
 ----
 렉이 걸리는 문제 해결 필요----
-# @log: 자동화 스크립트용 파일
+# [0.0.1] @done_log: 자동화 스크립트용 파일
 # --- 설정 변수 (운영 환경에 맞게 변경) ---
-IMAGE_TAR="bus_rt_monitoring_b3.0.31_doc.tar.gz"
+IMAGE_TAR="bus_rt_monitoring_b3.0.35_doc.tar.gz"
 # YAML_FILE="k8s-cronjob.yaml"
-YAML_FILE="k8s-mq-architecture.yaml"
+YAML_FILE="minikube-mq-architecture.yaml"
 INI_FILE="/home/gj_anly/ipconfig_cryp.ini"
 
 echo "🚀 에어갭 운영 환경 K8s 배포 파이프라인 시작..."

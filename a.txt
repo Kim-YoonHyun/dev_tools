@@ -129,6 +129,7 @@ pyproj==3.7.1
 PySocks==1.7.1
 python-dateutil @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_python-dateutil_1751104122/work
 python-dotenv==1.1.1
+python-json-logger==4.0.0
 python-slugify==8.0.4
 pytz==2025.2
 PyYAML==6.0.2
