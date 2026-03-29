@@ -1,15 +1,13 @@
 ﻿{
-	"docker-compose.yml": "1.0.0",
-	"k3s-mq-architecture-airgap": "1.0.0",
-	"minikube-cronjob.yaml": "1.0.1",
-	"minikube-deploy.yaml": "1.0.1",
-	"minikube-mq-architecture.yaml": "1.1.2",
-	"run_docker_compose.sh": "0.0.0",
-	"run_docker.sh": "0.0.2",
-	"run_k3s.sh": "0.0.1",
-	"run_minikube.sh": "0.0.1",
-	"run_monitoring.sh": "0.0.1",
-	"simple_versioning.py": "1.0.0",
-	"utils.py": "1.0.0",
-	"versioning.py": "1.0.1"
+	"dir": {
+		"docker": "1.0.2",
+		"docs": "0.0.1",
+		"kubernetes": "1.0.1",
+		"redis": "0.0.1"
+	},
+	"file": {
+		"simple_versioning.py": "1.1.0",
+		"utils.py": "1.0.0",
+		"versioning.py": "1.0.1"
+	}
 }

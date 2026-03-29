@@ -22,3 +22,11 @@
 **Summary:** 버전 업그레이드<br>
 **Detail:**<br>
 - 
+
+
+## 2026-03-29 Version 1.1.0
+**Tag:** @Feature<br>
+**Summary:** 폴더와 파일 구분<br>
+**Detail:**<br>
+- version_dict 의 구조 변경에 맞춰 simple 버저닝 방식도 변경
+- 폴더용 플래그 및 변경된 파일 경로를 담을 dict 생성

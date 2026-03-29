@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: consumer
-        image: bus_rt_monitoring:b3.0.35
+        image: test:dev
         imagePullPolicy: Never
         # 역할(role)을 consumer로 지정하여 무한 대기 모드로 실행
         command: [
@@ -24,6 +24,7 @@ spec:
           "--run_mode", "normal", 
           "--env", "dev", 
           "--role", "consumer",
+          "--engine", "k8s",
           # "--local"
         ]
         # 무한 실행용
@@ -69,7 +70,7 @@ spec:
           restartPolicy: OnFailure # 끝나면 재시작하지 않음
           containers:
           - name: producer
-            image: bus_rt_monitoring:b3.0.35
+            image: test:dev
             imagePullPolicy: Never
             # 💡 역할(role)을 producer로 지정하여 10초 만에 목록만 만들고 퇴근
             command: [
@@ -78,6 +79,7 @@ spec:
               "--run_mode", "normal", 
               "--env", "dev", 
               "--role", "producer",
+              "--engine", "k8s",
               # "--local"
             ]
             # command: ["sleep", "infinity"]
