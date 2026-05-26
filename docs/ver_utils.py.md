@@ -25,3 +25,10 @@
 **Summary:** 첫 버전 업<br>
 **Detail:**<br>
 - 
+
+
+## 2026-05-26 Version 1.0.1
+**Tag:** @Refactoring<br>
+**Summary:** 연산방식 개선<br>
+**Detail:**<br>
+- `versionup_documenting` 함수 연산방식 개선

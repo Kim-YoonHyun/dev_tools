@@ -1,8 +1,9 @@
 # [1.0.2] @done_log: 도커 컴포즈와 Redis 를 연동
-version: '3.8'
-
 # 공용설정(mode, 호스트 경로 마운트 등)
 x-common-config: &common-config
+  # 공용 설정에 이미지이름 추가
+  # image: test:dev
+  image: test:dev
   network_mode: "host"
   # "호스트의경로:image내부경로:모드" 형태로 설정
   # ro : read-only, 아무것도 지정하지 않으면 rw (read/write) 가 기본설정됨
@@ -11,9 +12,21 @@ x-common-config: &common-config
     - /home/gj_anly/cryptogram:/cryptogram:ro
     - /etc/localtime:/etc/localtime:ro
     - /etc/timezone:/etc/timezone:ro
+    # [1.0.3] @done_log: 컨테이너 내부 로그 파일이 호스트에 저장되도록 볼륨마운트 진행
+    - /home/gj_anly/bus_rt_monitoring_logs:/app/src/analy_module/log:rw
+    # [1.0.3] @done_log: resource 가 아니라 외부 파일을 통해 추정하도록 변경
+    - /home/gj_anly/bus_rt_monitoring_batt:/bus_rt_monitoring_batt:rw
   environment:
     # 파이썬 코드에서 읽어들일 Redis 주소
     - REDIS_HOST=127.0.0.1
+  deploy:
+    resources:
+      reservations:
+        cpus: '0.05'      # 최소 보장 CPU 5%
+        memory: 100M     # 최소 보장 메모리
+      limits:
+        cpus: '0.5'      # 최대 허용 CPU 50%
+        memory: 4096M     # 최대 허용 메모리 4GiB
 
 services:
 # 1. 메시지 큐 (Redis) 추가
@@ -24,8 +37,8 @@ services:
     
 # 2. 반장 컨테이너 (Producer)
   analy-producer:  
-    <<: *common-config  
-    image: bus_rt_monitoring:b3.0.41
+    <<: *common-config
+    # image: bus_rt_monitoring:b3.0.41
     # 프로듀서는 작업을 밀어넣고 종료되므로, 계속 재시작되며 작업을 체크하게 합니다.
     # container.py 내부에 (큐가 비어있지 않으면 skip하는 방어 로직)이 있으므로 문제없습니다.
     restart: always 
@@ -43,7 +56,7 @@ services:
   # 3. 작업자 컨테이너 (Consumer)
   analy-consumer:
     <<: *common-config
-    image: bus_rt_monitoring:b3.0.41
+    # image: bus_rt_monitoring:b3.0.41
     restart: always
     command: [
       "python", "-m", "scripts.run", 
@@ -56,32 +69,14 @@ services:
     depends_on:
       - redis-queue
     deploy:
-      replicas: 5
-
-
-  # # compose 실행시 서비스 이름
-  # analy-module:  
-  # # 공통 설정 불러오기
-  #   <<: *common-config  
-  #   # 실행할 이미지 이름
-  #   image: test:dev
-  #   restart: always
-  #   # 이미지 내 소스코드 실행 명령어
-  #   command: [
-  #     "python", "-m", "scripts.run", 
-  #     "--name", "analy_module", 
-  #     "--env", "dev", 
-  #     "--run_mode", "normal", 
-  #     "--role", "producer",
-  #     # "--role", "consumer",
-  #     "--local"
-  #     ]
+      replicas: 2
 
   data-module:
     <<: *common-config
-    image: test:dev
+    # image: test:dev
     command: ["python", "-m", "data_module.run"]
 
   route-module:
-    image: test:dev
+    <<: *common-config
+    # image: test:dev
     command: ["python", "-m", "route_module.run"]

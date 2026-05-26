@@ -1,23 +1,60 @@
-# [1.0.0] @done_log: 작업자(Consumer) 설정: 24시간 내내 큐만 바라보며 연산하는 워커 3명
+# 모든 k8s YAML 파일은 반드시 4가지로 시작됨
+# 1. apiVersion : 이 기능을 제공하는 K8s 의 버전
+# 2. kind : 만들고자하는 객체의 종류
+# 3. metadata : 해당 객체의 이름표
+# 4. spec : 해당 객체가 가져야할 "원하는 상태" 의 상세 규격
+
+# 컨슈머 객체
 apiVersion: apps/v1
+
+# Deployment 는 "죽지 않고 계속 실행(Always)되어야 하는 프로그램" 을 관리하는 가장 대표적 설정
+# 웹 서버 또는 무한루프식 워커에 사용
 kind: Deployment
+
+# 이 Deployment 의 고유 이름 설정
 metadata:
   name: analy-consumer
+  
 spec:
-  replicas: 10  # 💡 마법의 숫자: 작업자를 3명으로 늘립니다! (10으로 바꾸면 10명이 됩니다)
+  
+  # 오토힐링 및 스케일링 담당
+  # 항상 10개의 컨테이너가 떠 있도록 유지
+  # 만약 서버 하나가 물리적으로 불타서 컨테이너 3개가 죽으면 
+  # 다른 정상 서버에서 즉시 3개를 띄워 항상 10개 유지
+  replicas: 2
+  
+  # analy-consumer 라는 이름표를 달고 있다는 식별(추적)을 하는 설정
   selector:
     matchLabels:
       app: analy-consumer
+  
+  # Deployment 가 찍어낼 pod 의 명세서
+  # K8s 에서는 컨테이너를 직접 띄우지 않고 pod 라는 캡슐로 한번 감싸서 띄움
   template:
+    
+    # 이 pod의 이름표 (selector 와 반드시 일치해야 Deployment 가 인식함)
     metadata:
       labels:
         app: analy-consumer
+    
     spec:
+    
+      # pod 캡슐 안에 들어갈 실제 docker 컨테이너들의 정보
       containers:
+      
+      # 임의 지정한 컨테이너의 이름
       - name: consumer
-        image: test:dev
+
+        env:
+        - name: TZ
+          value: "Asia/Seoul"
+      
+        image: ${MODULE_IMAGE} # 입력 받은 인자를 변수로 받아들이는 설정 (run_minikube.sh 연계)
+        
+        # 도커허브에서 이미지 다운을 하지 않고 무조건 현재 컴퓨터의 로컬 이미지를 쓰라는 강제 사용 설정
         imagePullPolicy: Never
-        # 역할(role)을 consumer로 지정하여 무한 대기 모드로 실행
+        
+        # 파드 작동시 바로 실행될 명령어
         command: [
           "python", "-m", "scripts.run", 
           "--name", "analy_module", 
@@ -25,17 +62,24 @@ spec:
           "--env", "dev", 
           "--role", "consumer",
           "--engine", "k8s",
-          # "--local"
         ]
-        # 무한 실행용
+        # 파드가 바로 complete 되어 끝나버리면 내부에 들어갈 수 없는 것을 방지하고 들어가보기 위한 무한 실행용
         # command: ["sleep", "infinity"]
+        
+        # 서버 폭주를 막는 K8s 의 핵심 리소스 관리 설정
         resources:
+          # 최소
           requests:
-            memory: "100Mi" # 최소 보장 메모리
+            memory: "3Gi" # 최소 보장 메모리
             cpu: "100m"     # 최소 보장 CPU
+          # 최대
           limits:
-            memory: "500Mi" # 💡 이 이상 쓰면 K8s가 파드를 강제로 죽이고 재시작함 (서버 보호)
-            cpu: "500m"     # 💡 최대 CPU 한계치
+            # memory: "500Mi" # 💡 이 이상 쓰면 K8s가 파드를 강제로 죽이고 재시작함 (서버 보호)
+            memory: "8Gi"
+            cpu: "1000m"     # 💡 최대 CPU 한계치
+            
+        # K8s 는 여러 컴퓨터에 걸쳐 작동하는 것을 전제로 하기 때문에
+        # 도커의 단순 볼륨 마운트보다 설정이 복잡함
         volumeMounts:
         - name: ipconfig-vol
           mountPath: /ipconfig_cryp.ini
@@ -44,35 +88,62 @@ spec:
         - name: cryptogram-vol
           mountPath: /cryptogram
           readOnly: true
+        # [추가] 로그 디렉토리를 컨테이너 내부에 마운트
+        - name: log-vol
+          mountPath: /app/src/analy_module/log
+
       volumes:
       - name: ipconfig-vol
-        configMap:
+        configMap: # 설정파일을 텍스트 덩어리 째로 K8s DB 에 저장 후 파일처럼 컨테이너 안에 꽂아줌
           name: ipconfig-cmap
+
       - name: cryptogram-vol
-        hostPath:
+        hostPath: # 도커와 유사한 마운트 방식
           path: /home/gj_anly/cryptogram
 
+      # [추가] 호스트(미니쿠베 노드)의 실제 경로 설정
+      - name: log-vol
+        hostPath:
+          path: /home/gj_anly/bus_rt_monitoring_logs
+          # DirectoryOrCreate: 경로가 존재하지 않으면 디렉토리를 자동으로 생성해 줌 (Docker의 기본 동작과 유사)
+          type: DirectoryOrCreate
+
+# YAML 파일 전용 문서 구분자. 위는 Deployment 지만 아래는 완전히 별개의 K8s 객체로 인식
 ---
-# =====================================================================
-# 2. 반장(Producer) 설정: 5분마다 DB에서 1000개를 읽어 큐에 넣고 퇴근
-# =====================================================================
+# producer 객체
 apiVersion: batch/v1
+
+# 특정 시간에만 생성되어 작업이 끝나면 바로 죽도록 (Exit) 만든 객체
 kind: CronJob
 metadata:
   name: analy-producer-cron
+ 
 spec:
+  # linux 의 crontab 설정을 그대로 사용
   schedule: "*/5 * * * *"     # 5분 주기 실행
-  concurrencyPolicy: Forbid   # 중복 실행 방지
+  
+  # 5분 안에 작업이 안 끝났을때 새 작업이 바로 실행되지 않도록 다음 스케쥴은 건너뜀(중복 실행 방지)
+  concurrencyPolicy: Forbid
+  
+  # Cronjob 이 5분마다 찍어서 하달하는 job 을 만들기 위한 명세서 역할
+  # 시간이 되면 jobTemplate 의 내용을 그대로 복사해서 Job 객체를 하나 생성하면
+  # 그 Job 은 자신의 template 을 보고 Pod 를 생성하여 일을 시키는 구조
+  # 굳이 바로 Job 을 실행하지 않고 JobTemplate 를 만드는 이유는 역할 분담을 위해서임
+  # 만약 Cronjob 이 Pod 를 직접 관리한다면 CronJob 의 소스 코드 안에 
+  # "시간 일정 계산+Pod 재시작 + Pod 성공/실패 판별" 로직이 전부 들어가야해서 너무 무거워짐
+  # 이에 K8s 는 Job 이라는 1회성 배치 처리기를 재활용하기를 선택
   jobTemplate:
     spec:
       template:
         spec:
-          restartPolicy: OnFailure # 끝나면 재시작하지 않음
+          # 항상 재시작(always) 하는 Deploment 와 다르게
+          # CronJob 은 한번 실행 후 종료가 목적이기 때문에 끝나면 Completed 상태로 둠
+          # 에러가 났을 경우 (OnFailure) 만 다시 시도
+          restartPolicy: OnFailure 
           containers:
           - name: producer
-            image: test:dev
+            image: ${MODULE_IMAGE}
             imagePullPolicy: Never
-            # 💡 역할(role)을 producer로 지정하여 10초 만에 목록만 만들고 퇴근
             command: [
               "python", "-m", "scripts.run", 
               "--name", "analy_module", 
@@ -80,16 +151,16 @@ spec:
               "--env", "dev", 
               "--role", "producer",
               "--engine", "k8s",
-              # "--local"
             ]
             # command: ["sleep", "infinity"]
             resources:
               requests:
-                memory: "100Mi" # 최소 보장 메모리
-                cpu: "100m"     # 최소 보장 CPU
+                memory: "100Mi" 
+                cpu: "100m"     
               limits:
-                memory: "500Mi" # 💡 이 이상 쓰면 K8s가 파드를 강제로 죽이고 재시작함 (서버 보호)
-                cpu: "500m"     # 💡 최대 CPU 한계치
+                memory: "500Mi" 
+                cpu: "500m"   
+
             volumeMounts:
             - name: ipconfig-vol
               mountPath: /ipconfig_cryp.ini
@@ -98,6 +169,10 @@ spec:
             - name: cryptogram-vol
               mountPath: /cryptogram
               readOnly: true
+            # [추가]
+            - name: log-vol
+              mountPath: /app/src/analy_module/log
+              
           volumes:
           - name: ipconfig-vol
             configMap:
@@ -105,3 +180,8 @@ spec:
           - name: cryptogram-vol
             hostPath:
               path: /home/gj_anly/cryptogram
+          # [추가]
+          - name: log-vol
+            hostPath:
+              path: /home/gj_anly/bus_rt_monitoring_logs
+              type: DirectoryOrCreate

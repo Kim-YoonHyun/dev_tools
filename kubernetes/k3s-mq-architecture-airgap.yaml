@@ -5,13 +5,17 @@ metadata:
   name: analy-consumer
 spec:
   replicas: 10  # 💡 마법의 숫자: 작업자를 3명으로 늘립니다! (10으로 바꾸면 10명이 됩니다)
+
   selector:
     matchLabels:
       app: analy-consumer
+
   template:
+
     metadata:
       labels:
         app: analy-consumer
+
     spec:
       containers:
       - name: consumer
@@ -24,10 +28,11 @@ spec:
           "--run_mode", "normal", 
           "--env", "dev", 
           "--role", "consumer",
-          # "--local"
+          "--engine", "k8s",
         ]
         # 무한 실행용
         # command: ["sleep", "infinity"]
+
         resources:
           requests:
             memory: "100Mi" # 최소 보장 메모리
@@ -35,6 +40,7 @@ spec:
           limits:
             memory: "500Mi" # 💡 이 이상 쓰면 K8s가 파드를 강제로 죽이고 재시작함 (서버 보호)
             cpu: "500m"     # 💡 최대 CPU 한계치
+
         volumeMounts:
         - name: ipconfig-vol
           mountPath: /ipconfig_cryp.ini
@@ -43,6 +49,7 @@ spec:
         - name: cryptogram-vol
           mountPath: /cryptogram
           readOnly: true
+
       volumes:
       - name: ipconfig-vol
         configMap:
@@ -78,7 +85,7 @@ spec:
               "--run_mode", "normal", 
               "--env", "dev", 
               "--role", "producer",
-              # "--local"
+              "--engine", "k8s",
             ]
             # command: ["sleep", "infinity"]
             resources:
@@ -88,6 +95,7 @@ spec:
               limits:
                 memory: "500Mi" # 💡 이 이상 쓰면 K8s가 파드를 강제로 죽이고 재시작함 (서버 보호)
                 cpu: "500m"     # 💡 최대 CPU 한계치
+
             volumeMounts:
             - name: ipconfig-vol
               mountPath: /ipconfig_cryp.ini
@@ -96,6 +104,7 @@ spec:
             - name: cryptogram-vol
               mountPath: /cryptogram
               readOnly: true
+
           volumes:
           - name: ipconfig-vol
             configMap:
@@ -105,7 +114,7 @@ spec:
               path: /home/gj_anly/cryptogram
 
 ---
-# 1. Redis 작업 반장 (Deployment)
+# Redis 를 띄워줄 Deployment. 데이터 무결성이 중요하므로 딱 1개만 띄워서 중앙 집중형 queue 로 사용
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -122,20 +131,30 @@ spec:
     spec:
       containers:
       - name: redis
-        image: redis:7-alpine  # 구워오신 Redis 이미지 태그와 똑같이 맞춰주세요 (예: redis:latest)
-        imagePullPolicy: Never   # 💡 [핵심] 인터넷에서 받지 말고 서버에 있는 거 써라!
+        image: redis:7-alpine  # 구워온 Redis 이미지 태그와 동일하게
+        imagePullPolicy: Never   # [핵심] 인터넷에서 받지 말고 서버에 있는 것을 활용
+
+        # 이 파드는 6379번 포트를 열고 트래픽을 기다리겠다고 K8s시스템에 신고하는 역할
         ports:
         - containerPort: 6379
 
 ---
-# 2. Redis 연결 통로 (Service - 파이썬이 접속할 이름)
+# Redis 연결 통로 (Service - 파이썬이 접속할 이름)
 apiVersion: v1
+# Service 는 K8s 내부의 고정된 주소(DNS)이자 로드 밸런서 역할을 하는 객체
 kind: Service
+
+# 파이썬 코드 내부에 정의한 임의의 도메인 명칭
 metadata:
   name: redis-svc
 spec:
+  # 이 Service 가 어떤 파드에 트래픽을 보낼지 그 타겟을 찾는 기준
+  # 앞서 만든 Redis Deployment 의 redis 이름표를 단 파드를 추적
   selector:
     app: redis
+
+  # 파이썬 워커 (consumer) 들이 접속할 Service 의 포트.
+  # 일반적으로 둘다 6379로 맞춤  
   ports:
   - port: 6379
-    targetPort: 6379
+    targetPort: 6379 # Service 가 트래픽을 받아서 실제 Redis 파드의 몇 번 포트로 꽂아줄지 결정

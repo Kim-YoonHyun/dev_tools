@@ -1,13 +1,13 @@
 ﻿{
 	"dir": {
-		"docker": "1.0.2",
+		"docker": "1.0.3",
 		"docs": "0.0.1",
-		"kubernetes": "1.0.1",
-		"redis": "0.0.1"
+		"kubernetes": "1.0.2",
+		"redis": "0.0.2"
 	},
 	"file": {
 		"simple_versioning.py": "1.1.0",
-		"utils.py": "1.0.0",
-		"versioning.py": "1.0.1"
+		"utils.py": "1.0.1",
+		"versioning.py": "1.0.2"
 	}
 }

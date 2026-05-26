@@ -264,89 +264,100 @@ def simple_documenting(name, comment_log, pre_version):
 
 # [1.0.0] @done_log: 내부 연산을 가시성 증가용 함수 `versionup_documenting` 로 분리
 # [1.0.0] @done_log: `versionup_documenting` 함수 인자에 check_only 추가
-def versionup_documenting(file_stat_info_list, comp_info_filter_list, flag_dict, 
-                          comment_log_dict, lock_info, check_only, save, docs_path):
+# [1.0.1] @done_log: `versionup_documenting` 함수 연산방식 개선
+# ---------------------------------------------------------------------------
+# Improved versionup_documenting
+# Replaces utils.versionup_documenting to fix:
+#   - O(n²) linear search → O(1) dict lookup
+#   - Silent check_only exit → informative message with component name
+#   - extract_log called on deleted files → guarded by status check
+# ---------------------------------------------------------------------------
+def versionup_documenting(
+    file_stat_info_list, comp_info_filter_list, flag_dict,
+    comment_log_dict, lock_info, check_only, save, docs_path
+):
+    # O(1) lookup: component name → pre-version (replaces O(n) linear search)
+    pre_version_map = {c["name"]: c["version"] for c in lock_info["component"]}
 
     component_ver_log = ""
+    changed_components = []  # [(name, pre_version, new_version), ...]
+
     for comp_info_filter in comp_info_filter_list:
         c_name = comp_info_filter["name"]
         c_path = comp_info_filter["path"]
         c_mode = comp_info_filter["mode"]
 
         # 컴포넌트 이전 버전 추출
-        _flag = 0
-        for lock_c_info in lock_info["component"]:
-            lock_c_name = lock_c_info["name"]
-            pre_c_version = lock_c_info["version"]
-            if lock_c_name == c_name:
-                _flag = 1
-                break
-        if _flag == 0:
-            pre_c_version = "0.0.0"
-        del _flag
+        pre_c_version = pre_version_map.get(c_name, "0.0.0")
 
         # 파일 변경 이력(flag=1)이 있는 경우 버전업 진행
-        try: flag = flag_dict[c_name]
-        except KeyError: flag = 0
+        flag = flag_dict.get(c_name, 0)
         if flag == 1:
             # 해당 컴포넌트의 로그 추출
             comment_log = comment_log_dict[c_name]
 
             # 컴포넌트별 변경 이력 출력
             title_print(
-                title=f"component : < {c_name} >", 
-                log_text=comment_log
+                title=f"component : < {c_name} >",
+                log_text=comment_log,
             )
-            
+
             # 버전 업
-            if not check_only:
-                new_c_version, tag = version_up(c_name, pre_c_version)
-                print(f"{tag}: {pre_c_version} --> {new_c_version}")
-            else:
-                # retuncode 를 1 으로 설정(build 시 검증용)
+            if check_only:
+                # Informative exit: tell the caller exactly which component triggered it
+                print(
+                    f"\n[check-only] Uncommitted change detected in component "
+                    f"'{c_name}'. Exiting with code 1."
+                )
                 sys.exit(1)
+            new_c_version, tag = version_up(c_name, pre_c_version)
+            print(f"{tag}: {pre_c_version} --> {new_c_version}")
 
             # 컴포넌트 버전 업 로그 기록
-            component_ver_log += f"- {c_name:>15s} version ({pre_c_version}) --> ({new_c_version})\n"
+            component_ver_log += (
+                f"- {c_name:>15s} version ({pre_c_version}) --> ({new_c_version})\n"
+            )
+            changed_components.append((c_name, pre_c_version, new_c_version))
 
             # 버전파일, 설명.md 파일 저장
             if save:
-                # __version__.py.tmp 저장
                 if c_mode == "dir":
                     ver_path = Path(c_path) / "__version__.py"
                 elif c_mode == "file_group":
                     ver_path = Path(c_path) / c_name
                 else:
-                    raise ValueError(f"mode({c_mode}) 값은 'dir' 또는 'file_group' 이어야 합니다. manifest.json 내용 확인 필요.")
-                with open(f"{ver_path}.tmp", 'w') as f:
+                    raise ValueError(
+                        f"mode('{c_mode}') must be 'dir' or 'file_group'. "
+                        f"Check manifest.json for component '{c_name}'."
+                    )
+                with open(f"{ver_path}.tmp", "w") as f:
                     f.write(f'__version__ = "{new_c_version}"')
 
                 # [1.0.0] @done_log: 버전 기록 md 은 docs_ver 에
-                summary = input("버전 요약 입력 : ")
-                _ = documenting(
-                    tag=tag, 
-                    summary=summary, 
-                    version=new_c_version, 
-                    log_contents=comment_log, 
+                summary = input(f"버전 요약 입력 [{c_name}]: ")
+                documenting(
+                    tag=tag,
+                    summary=summary,
+                    version=new_c_version,
+                    log_contents=comment_log,
                     docs_path=docs_path,
-                    docs_name=f"ver_{c_name}.md"
+                    docs_name=f"ver_{c_name}.md",
                 )
             else:
                 print(f"|예정| ver_{c_name}.md.tmp 생성")
         else:
             new_c_version = pre_c_version
-        
+
         # 컵포넌트 새 버전 업데이트
         comp_info_filter["version"] = new_c_version
 
         # 각 결과 파일별 컴포넌트 새 버전 값 할당
-        for file_stat_info in file_stat_info_list:
-            f_c_name = file_stat_info["component_name"]
-            if f_c_name == c_name:
-                file_stat_info["version"] = new_c_version
+        for fsi in file_stat_info_list:
+            if fsi["component_name"] == c_name:
+                fsi["version"] = new_c_version
 
     # 버전 정보가 업데이트된 컴포넌트 정보 리스트 리턴
-    return file_stat_info_list, comp_info_filter_list, component_ver_log
+    return file_stat_info_list, comp_info_filter_list, component_ver_log, changed_components
 
 
 # [1.0.0] @done_log: 아카이빙 오류 수정

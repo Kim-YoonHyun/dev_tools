@@ -6,3 +6,10 @@
 **Summary:** 따로 모음<br>
 **Detail:**<br>
 - (업데이트 내역 생략 / 자동 감지)
+
+
+## 2026-05-26 Version 1.0.2
+**Tag:** @Patch<br>
+**Summary:** 방식 변경<br>
+**Detail:**<br>
+- [수정됨] Kustomize(-k) 대신 envsubst 사용

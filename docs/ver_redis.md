@@ -6,3 +6,10 @@
 **Summary:** 따로 모음<br>
 **Detail:**<br>
 - (업데이트 내역 생략 / 자동 감지)
+
+
+## 2026-05-26 Version 0.0.2
+**Tag:** @Refactoring<br>
+**Summary:** update<br>
+**Detail:**<br>
+- (업데이트 내역 생략 / 자동 감지)

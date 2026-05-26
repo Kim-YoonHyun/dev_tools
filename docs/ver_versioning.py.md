@@ -23,3 +23,10 @@
 **Summary:** git 오류로 인한 재진행<br>
 **Detail:**<br>
 - 
+
+
+## 2026-05-26 Version 1.0.2
+**Tag:** @Refactoring<br>
+**Summary:** 연산 방식 개선<br>
+**Detail:**<br>
+- 해시 스키마 버전값을 추출하는 부분을 구획
